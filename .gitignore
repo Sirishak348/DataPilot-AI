@@ -12,6 +12,7 @@ backend/*/*/__pycache__/
 *.db
 *.sqlite
 *.sqlite3
+storage/
 backend/storage/
 backend/datapilot.db
 

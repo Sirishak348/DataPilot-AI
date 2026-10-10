@@ -3,7 +3,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import engine, Base
@@ -79,10 +80,48 @@ def health_check():
         "gemini_configured": bool(settings.GEMINI_API_KEY.strip())
     }
 
+# Path to built Vite frontend assets
+FRONTEND_DIST_DIR = os.path.abspath(os.path.join(settings.BASE_DIR, "..", "frontend", "dist"))
+
+# Mount /assets if frontend build exists
+assets_dir = os.path.join(FRONTEND_DIST_DIR, "assets")
+if os.path.isdir(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global error on {request.method} {request.url.path}: {str(exc)}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "An internal server error occurred. Please try again or check parameters."}
+    )
+
+# SPA fallback handler for React Router
+@app.get("/{full_path:path}")
+async def serve_spa_frontend(full_path: str):
+    """
+    Serves the static Vite frontend for single-service deployment.
+    Non-API routes return the SPA index.html or matching static files (e.g., favicon, icons).
+    Unmatched API paths return a 404 JSON instead of HTML.
+    """
+    if full_path.startswith("api/") or full_path == "api":
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": f"API endpoint '/{full_path}' not found."}
+        )
+
+    # Serve static root files if present (e.g. favicon.svg, icons.svg, manifest.json)
+    if os.path.isdir(FRONTEND_DIST_DIR):
+        file_path = os.path.join(FRONTEND_DIST_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # SPA entrypoint for client-side routing
+        index_file = os.path.join(FRONTEND_DIST_DIR, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"detail": "Frontend build not found. Please build the frontend."}
     )

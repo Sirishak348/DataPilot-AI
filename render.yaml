@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: datapilot-ai
+    runtime: python
+    buildCommand: "cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: APP_NAME
+        value: "DataPilot AI"
+      - key: APP_ENV
+        value: "production"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DATABASE_URL
+        value: "sqlite:///./datapilot.db"
+      - key: GEMINI_API_KEY
+        sync: false

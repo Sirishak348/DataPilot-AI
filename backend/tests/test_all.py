@@ -495,3 +495,21 @@ def test_dataset_ownership_security(client, auth_headers, second_user_headers):
 
     forbidden_delete = client.delete(f"/api/datasets/{dataset_id}", headers=second_user_headers)
     assert forbidden_delete.status_code == 404
+
+# 12. SPA ROUTING & FALLBACK TESTS
+def test_spa_routing_and_unmatched_api(client):
+    # Non-API routes should serve SPA index.html or static asset
+    root_resp = client.get("/")
+    assert root_resp.status_code == 200
+    assert "text/html" in root_resp.headers.get("content-type", "")
+
+    dashboard_resp = client.get("/dashboard")
+    assert dashboard_resp.status_code == 200
+    assert "text/html" in dashboard_resp.headers.get("content-type", "")
+
+    # Unmatched /api/* route must return 404 JSON, NOT HTML
+    api_404_resp = client.get("/api/non_existent_endpoint")
+    assert api_404_resp.status_code == 404
+    assert "application/json" in api_404_resp.headers.get("content-type", "")
+    assert "not found" in api_404_resp.json().get("detail", "").lower()
+
